@@ -40,4 +40,25 @@ export class ConfigModule {
       exports: [configProvider],
     };
   }
+
+  /**
+   * From Glob
+   * @param glob
+   * @param url
+   * @param {ConfigOptions} options
+   * @returns {DynamicModule}
+   */
+  static loadRemote(glob: string,url:string, options?: ConfigOptions): DynamicModule {
+    const configProvider = {
+      provide: ConfigService,
+      useFactory: async (): Promise<ConfigService> => {
+        return ConfigService.loadRemote(glob,url, options);
+      },
+    };
+    return {
+      module: ConfigModule,
+      providers: [configProvider],
+      exports: [configProvider],
+    };
+  }
 }

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import * as assert from 'assert';
 import * as get from 'lodash.get';
 import * as set from 'lodash.set';
+import * as http from 'http';
 import { DotenvConfigOptions, config as dotenv } from 'dotenv';
 import * as path from 'path';
 import { Glob, sync as globSync } from 'glob';
@@ -58,6 +59,55 @@ export class ConfigService {
   ): Promise<ConfigService> {
     const configs = await this.loadConfigAsync(glob, options);
     return new ConfigService(configs);
+  }
+
+  /**
+   * Load configuration from file system
+   * @param glob string
+   * @param url string
+   * @param {DotenvOptions} options
+   * @returns {Promise<any>}
+   */
+  static async loadRemote(
+    glob: string,
+    url: string,
+    options?: ConfigOptions | false,
+  ): Promise<ConfigService> {
+    const configs = await this.loadConfigAsync(glob, options);
+    const configService = new ConfigService(configs);
+    http.get(url,(res)=>{
+      let err;
+      let configHtml = ''
+      const { statusCode } = res;
+      if (statusCode === 200)
+        err = new Error("服务器响应失败");
+      if (/application\/json/.test(res.headers["content-type"]))
+        err = new Error("数据格式错误，需要json格式");
+      if (err) {
+        // console.log(err);
+        //释放内存
+        res.resume();
+        return;
+      }
+
+      res.on("data",(data)=>{
+        configHtml+=data
+      })
+      //监听请求结束
+      res.on("end", () => {
+        try {
+          const configJson = JSON.parse(configHtml)
+          for (const i in configJson) {
+            set(ConfigService.config,i, configJson[i]);
+          }
+        } catch (e) {
+          // console.log(e);
+        }
+      });
+    }).on("error",(e)=>{
+      // console.log(`配置加载失败: ${e.message}`)
+    })
+    return configService
   }
 
   /**
